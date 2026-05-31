@@ -88,7 +88,7 @@ Or use the provided `Dockerfile` in this repo.
 
 ```caddyfile
 {
-    config_loader proxmox {
+    proxmox {
         api_endpoint  https://pve.example.com:8006
         api_token_id  root@pam!caddy
         api_token     {env.PROXMOX_API_TOKEN}
@@ -103,14 +103,15 @@ Or use the provided `Dockerfile` in this repo.
 
 ```json
 {
-  "config_loader": {
-    "module": "proxmox",
-    "api_endpoint": "https://pve.example.com:8006",
-    "api_token_id": "root@pam!caddy",
-    "api_token": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "poll_interval": "30s",
-    "validate_ssl": true,
-    "label_prefix": "caddy."
+  "apps": {
+    "proxmox": {
+      "api_endpoint": "https://pve.example.com:8006",
+      "api_token_id": "root@pam!caddy",
+      "api_token": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "poll_interval": "30s",
+      "validate_ssl": true,
+      "label_prefix": "caddy."
+    }
   }
 }
 ```
