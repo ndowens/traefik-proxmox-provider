@@ -1,0 +1,32 @@
+# Caddyfile — caddy-proxmox-provider example
+#
+# This Caddyfile configures Caddy to load its routing configuration from
+# Proxmox VE LXC container notes.  All routes are generated automatically;
+# you only manage labels in the Proxmox UI.
+#
+# Build Caddy with the plugin first:
+#   xcaddy build --with github.com/YOUR_USERNAME/caddy-proxmox-provider
+#   # or use the provided Dockerfile
+
+{
+    # Use the Proxmox provider as the config source.
+    # Caddy will reload routes every poll_interval without a full restart.
+    config_loader proxmox {
+        api_endpoint  https://pve.homelab.local:8006
+        api_token_id  root@pam!caddy
+        api_token     {env.PROXMOX_API_TOKEN}
+        poll_interval 30s
+        validate_ssl  false        # set true if you have a valid cert
+        label_prefix  caddy.       # lines starting with this are labels
+    }
+
+    # Global ACME email (can also be set per-container with caddy.tls)
+    email admin@example.com
+}
+
+# ── Fallback / health-check ────────────────────────────────────────────────────
+# Routes discovered from Proxmox are inserted dynamically; this block acts
+# as a catch-all for anything not matched by the generated routes.
+:80 {
+    respond "caddy-proxmox-provider is running" 200
+}
