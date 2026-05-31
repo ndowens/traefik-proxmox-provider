@@ -1,4 +1,4 @@
-module github.com/YOUR_USERNAME/caddy-proxmox-provider
+module github.com/ndowens/caddy-proxmox-provider
 
 go 1.22
 
