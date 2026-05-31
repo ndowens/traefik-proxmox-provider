@@ -44,7 +44,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/YOUR_USERNAME/caddy-proxmox-provider/internal/proxmox"
+	"github.com/ndowens/caddy-proxmox-provider/internal/proxmox"
 )
 
 // ----- Caddy JSON types (minimal, only what we generate) -----

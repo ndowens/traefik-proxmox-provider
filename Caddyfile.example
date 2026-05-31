@@ -5,7 +5,7 @@
 # you only manage labels in the Proxmox UI.
 #
 # Build Caddy with the plugin first:
-#   xcaddy build --with github.com/YOUR_USERNAME/caddy-proxmox-provider
+#   xcaddy build --with github.com/ndowens/caddy-proxmox-provider
 #   # or use the provided Dockerfile
 
 {

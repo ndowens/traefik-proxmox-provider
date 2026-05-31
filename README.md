@@ -65,14 +65,14 @@ automatically when only a port is given:
 ### With xcaddy (recommended)
 
 ```bash
-xcaddy build --with github.com/YOUR_USERNAME/caddy-proxmox-provider
+xcaddy build --with github.com/ndowens/caddy-proxmox-provider
 ```
 
 ### With Docker
 
 ```dockerfile
 FROM caddy:2.8-builder AS builder
-RUN xcaddy build --with github.com/YOUR_USERNAME/caddy-proxmox-provider
+RUN xcaddy build --with github.com/ndowens/caddy-proxmox-provider
 
 FROM caddy:2.8-alpine
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy

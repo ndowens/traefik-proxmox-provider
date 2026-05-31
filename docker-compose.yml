@@ -4,7 +4,7 @@ services:
   caddy:
     build: .                        # uses the Dockerfile in this repo
     # OR use a pre-built image:
-    # image: ghcr.io/YOUR_USERNAME/caddy-proxmox-provider:latest
+    # image: ghcr.io/ndowens/caddy-proxmox-provider:latest
     container_name: caddy-proxmox
     restart: unless-stopped
     ports:

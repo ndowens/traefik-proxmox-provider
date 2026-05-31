@@ -9,7 +9,7 @@ import (
 	_ "github.com/caddyserver/caddy/v2/modules/standard"
 
 	// Import this plugin
-	_ "github.com/YOUR_USERNAME/caddy-proxmox-provider"
+	_ "github.com/ndowens/caddy-proxmox-provider"
 )
 
 func main() {

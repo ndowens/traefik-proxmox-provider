@@ -24,8 +24,8 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"go.uber.org/zap"
 
-	"github.com/YOUR_USERNAME/caddy-proxmox-provider/internal/caddyconfig_builder"
-	"github.com/YOUR_USERNAME/caddy-proxmox-provider/internal/proxmox"
+	"github.com/ndowens/caddy-proxmox-provider/internal/caddyconfig_builder"
+	"github.com/ndowens/caddy-proxmox-provider/internal/proxmox"
 )
 
 func init() {

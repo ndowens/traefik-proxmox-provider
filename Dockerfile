@@ -5,10 +5,10 @@ ARG CADDY_VERSION=2.8.4
 
 FROM caddy:${CADDY_VERSION}-builder AS builder
 
-# Replace YOUR_USERNAME with your GitHub username (or any module path)
+# Replace ndowens with your GitHub username (or any module path)
 # to publish this module.  For local use, xcaddy can reference a local path.
 RUN xcaddy build \
-    --with github.com/YOUR_USERNAME/caddy-proxmox-provider
+    --with github.com/ndowens/caddy-proxmox-provider
 
 # ── Stage 2: minimal runtime image ────────────────────────────────────────────
 FROM caddy:${CADDY_VERSION}-alpine

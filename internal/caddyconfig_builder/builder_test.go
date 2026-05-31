@@ -6,8 +6,8 @@ import (
 
 	"go.uber.org/zap"
 
-	builder "github.com/YOUR_USERNAME/caddy-proxmox-provider/internal/caddyconfig_builder"
-	"github.com/YOUR_USERNAME/caddy-proxmox-provider/internal/proxmox"
+	builder "github.com/ndowens/caddy-proxmox-provider/internal/caddyconfig_builder"
+	"github.com/ndowens/caddy-proxmox-provider/internal/proxmox"
 )
 
 func TestBuildConfig_BasicReverseProxy(t *testing.T) {
