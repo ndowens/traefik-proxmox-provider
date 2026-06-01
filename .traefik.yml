@@ -1,0 +1,16 @@
+# The name displayed in the catalog
+displayName: Proxmox Provider
+# Must be 'provider' for a service discovery plugin
+type: provider
+# Must be 'yaegi' (explicitly or omitted as it's the default)
+runtime: yaegi
+# Must match the module name in your go.mod
+import: github.com/ndowens/traefik-proxmox-provider
+# A brief description
+summary: Traefik provider for Proxmox VE
+# Required for catalog indexing
+testData:
+  # Replace these with real keys/fields from your Config struct
+  endpoint: "https://proxmox.local:8006"
+  username: "root@pam"
+  password: "your-password"
