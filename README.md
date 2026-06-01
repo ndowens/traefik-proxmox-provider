@@ -1,168 +1,120 @@
-# caddy-proxmox-provider
+# Traefik Proxmox Provider
 
-A [Caddy](https://caddyserver.com/) config-loader plugin that polls a
-[Proxmox VE](https://www.proxmox.com/) cluster and automatically generates
-reverse-proxy routes from labels embedded in each LXC container's **Notes**
-field.
+A Traefik provider that automatically configures routing based on Proxmox VE virtual machines and containers.
 
-Inspired by [traefik-proxmox-provider](https://github.com/NX211/traefik-proxmox-provider).
+> **Fork note:** This is a fork of [NX211/traefik-proxmox-provider](https://github.com/NX211/traefik-proxmox-provider) with the following changes:
+> - **TLS on by default** — no need to add `tls=true` labels; opt out with `tls=false`
+> - **`websecure` entrypoint by default** — no need to add `entrypoints=websecure`
+> - **Port in rule label** — write `Host(\`app.example.com\`):8080` instead of a separate `loadbalancer.server.port` label
 
----
+## Features
 
-## How it works
-
-1. Caddy starts and loads this plugin as its config source.
-2. The plugin polls the Proxmox API on a configurable interval.
-3. For every **running** LXC container it reads the Notes field.
-4. Lines starting with `caddy.` are parsed as labels.
-5. The plugin generates a Caddy JSON config and hot-reloads it with zero
-   downtime.
-
----
-
-## Proxmox Notes label syntax
-
-Write one label per line in the container's **Notes** field.
-All other lines are ignored, so you can mix free-form notes with labels.
-
-```
-My webserver — hosts the company intranet
-Updated 2024-01-15
-
-caddy.reverse_proxy intranet.example.com :8080
-caddy.tls admin@example.com
-caddy.encode intranet.example.com gzip zstd
-```
-
-### Supported labels
-
-| Label | Args | Description |
-|-------|------|-------------|
-| `caddy.reverse_proxy` | `<host> <upstream>` | Create a reverse-proxy virtual host |
-| `caddy.tls` | `<email>` | Set ACME email for all routes in this container |
-| `caddy.header` | `<host> <field> <value>` | Add a response header |
-| `caddy.basicauth` | `<host> <user> <bcrypt-hash>` | Enable HTTP basic auth |
-| `caddy.encode` | `<host> <enc…>` | Enable response encoding (e.g. `gzip`, `zstd`) |
-| `caddy.log` | _(none)_ | Enable access logging for this container's routes |
-
-### Upstream shorthand
-
-The `<upstream>` argument in `caddy.reverse_proxy` understands several
-shorthand forms.  The container's primary IP (from `net0`) is used
-automatically when only a port is given:
-
-| Notes value | Container IP | Resolved upstream |
-|-------------|-------------|-------------------|
-| `:8080` | `192.168.1.10` | `192.168.1.10:8080` |
-| `8080` | `192.168.1.10` | `192.168.1.10:8080` |
-| `192.168.1.10:8080` | _(any)_ | `192.168.1.10:8080` |
-| `myapp:8080` | _(any)_ | `myapp:8080` |
-
----
+- Automatically discovers Proxmox VE virtual machines and containers
+- Configures routing based on VM/container notes field
+- **TLS and `websecure` entrypoint enabled by default**
+- **Port can be specified inline in the router rule**
+- Configurable polling interval
+- SSL validation options
+- Full support for Traefik's routing, middleware, and TLS options
 
 ## Installation
 
-### With xcaddy (recommended)
+1. Add the plugin to your Traefik static configuration:
+
+```yaml
+experimental:
+  plugins:
+    traefik-proxmox-provider:
+      moduleName: github.com/NX211/traefik-proxmox-provider
+      version: v0.8.1
+```
+
+2. Configure the provider in your Traefik dynamic configuration:
+
+```yaml
+providers:
+  plugin:
+    traefik-proxmox-provider:
+      pollInterval: "30s"
+      apiEndpoint: "https://proxmox.example.com"
+      apiTokenId: "root@pam!traefik_prod"
+      apiToken: "your-api-token"
+      apiLogging: "info"
+      apiValidateSSL: "true"
+```
+
+## Proxmox API Token Setup
 
 ```bash
-xcaddy build --with github.com/ndowens/caddy-proxmox-provider
+# For Proxmox VE 8.x or earlier:
+pveum role add traefik-provider -privs "VM.Audit,VM.Monitor,Sys.Audit,Datastore.Audit"
+
+# For Proxmox VE 9.0+:
+pveum role add traefik-provider -privs "VM.Audit,VM.GuestAgent.Audit,Sys.Audit,Datastore.Audit"
+
+pveum user token add root@pam traefik_prod
+pveum acl modify / -token 'root@pam!traefik_prod' -role traefik-provider
 ```
 
-### With Docker
+## VM/Container Labeling
 
-```dockerfile
-FROM caddy:2.8-builder AS builder
-RUN xcaddy build --with github.com/ndowens/caddy-proxmox-provider
+Add Traefik labels to a VM or container's **Notes** field in Proxmox (one label per line).
 
-FROM caddy:2.8-alpine
-COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+### Minimal setup (new — port inline in rule)
+
+```
+traefik.enable=true
+traefik.http.routers.myapp.rule=Host(`myapp.example.com`):8080
 ```
 
-Or use the provided `Dockerfile` in this repo.
+This is equivalent to the old verbose form:
 
----
-
-## Configuration
-
-### Caddyfile (global options block)
-
-```caddyfile
-{
-    proxmox {
-        api_endpoint  https://pve.example.com:8006
-        api_token_id  root@pam!caddy
-        api_token     {env.PROXMOX_API_TOKEN}
-        poll_interval 30s
-        validate_ssl  true
-        label_prefix  caddy.
-    }
-}
+```
+traefik.enable=true
+traefik.http.routers.myapp.rule=Host(`myapp.example.com`)
+traefik.http.routers.myapp.entrypoints=websecure
+traefik.http.routers.myapp.tls=true
+traefik.http.services.appservice.loadbalancer.server.port=8080
 ```
 
-### JSON
+### Disabling TLS (plain HTTP)
 
-```json
-{
-  "apps": {
-    "proxmox": {
-      "api_endpoint": "https://pve.example.com:8006",
-      "api_token_id": "root@pam!caddy",
-      "api_token": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-      "poll_interval": "30s",
-      "validate_ssl": true,
-      "label_prefix": "caddy."
-    }
-  }
-}
+```
+traefik.enable=true
+traefik.http.routers.myapp.rule=Host(`myapp.example.com`):8080
+traefik.http.routers.myapp.tls=false
+traefik.http.routers.myapp.entrypoints=web
 ```
 
-### Options
+### Full example with all options
+
+```
+traefik.enable=true
+traefik.http.routers.myapp.rule=Host(`myapp.example.com`):8080
+traefik.http.routers.myapp.tls.certresolver=myresolver
+traefik.http.routers.myapp.middlewares=auth@file,compression
+traefik.http.services.myapp.loadbalancer.healthcheck.path=/health
+```
+
+## Configuration Options
 
 | Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `api_endpoint` | string | _(required)_ | Proxmox API base URL |
-| `api_token_id` | string | _(required)_ | API token ID, e.g. `root@pam!caddy` |
-| `api_token` | string | _(required)_ | API token secret |
-| `poll_interval` | duration | `30s` | How often to poll Proxmox |
-| `validate_ssl` | bool | `true` | Verify Proxmox TLS certificate |
-| `label_prefix` | string | `caddy.` | Line prefix treated as a label |
+|---|---|---|---|
+| `pollInterval` | string | `"30s"` | How often to poll the Proxmox API |
+| `apiEndpoint` | string | — | URL of your Proxmox VE API |
+| `apiTokenId` | string | — | API token ID (e.g. `root@pam!traefik_prod`) |
+| `apiToken` | string | — | API token secret |
+| `apiLogging` | string | `"info"` | Log level (`debug` or `info`) |
+| `apiValidateSSL` | string | `"true"` | Whether to validate SSL certificates |
 
----
+## Label Behaviour Changes vs Upstream
 
-## Proxmox permissions
-
-Create a dedicated role and API token with the minimum required permissions:
-
-```bash
-# Create role
-pveum role add caddy-provider -privs "VM.Audit,Sys.Audit,Datastore.Audit"
-
-# Create API token
-pveum user token add root@pam caddy
-
-# Assign role to token
-pveum acl modify / -token 'root@pam!caddy' -role caddy-provider
-```
-
-> **Save the token secret** when it is first displayed — it will not be shown again.
-
----
-
-## Development
-
-```bash
-# Run tests
-go test ./...
-
-# Build a local Caddy binary
-go build -o caddy ./cmd/caddy
-
-# Run with example config
-./caddy run --config Caddyfile.example --adapter caddyfile
-```
-
----
+| Behaviour | Upstream | This fork |
+|---|---|---|
+| TLS | Off unless `tls=true` | **On by default**; set `tls=false` to disable |
+| Entrypoint | None (Traefik default) | **`websecure`** unless overridden |
+| Port | Separate `loadbalancer.server.port` label | **Inline `:port` suffix on rule** OR separate label |
 
 ## License
 
-MIT
+Apache-2.0 — see [LICENSE](LICENSE)

@@ -1,8 +1,7 @@
-module github.com/ndowens/caddy-proxmox-provider
+module github.com/NX211/traefik-proxmox-provider
 
-go 1.22
+go 1.19
 
-require (
-	github.com/caddyserver/caddy/v2 v2.8.4
-	go.uber.org/zap v1.27.0
-)
+toolchain go1.25.6
+
+require github.com/traefik/genconf v0.5.2
