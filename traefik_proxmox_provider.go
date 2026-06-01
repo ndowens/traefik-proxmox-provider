@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/NX211/traefik-proxmox-provider/provider"
+	"github.com/ndowens/traefik-proxmox-provider/provider"
 )
 
 // Config the plugin configuration.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NX211/traefik-proxmox-provider/internal"
+	"github.com/ndowens/traefik-proxmox-provider/internal"
 	"github.com/traefik/genconf/dynamic"
 	"github.com/traefik/genconf/dynamic/tls"
 	"github.com/traefik/genconf/dynamic/types"
