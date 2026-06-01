@@ -1,31 +1,28 @@
-# Stage 1: builder                                                                                                                                             
-FROM golang:1.20-alpine AS builder                                                                                                                             
-RUN apk add --no-cache git ca-certificates                                                                                                                     
-                                                                                                                                                               
+# Stage 1: builder
+FROM golang:1.20-alpine AS builder
+RUN apk add --no-cache git ca-certificates
+
 WORKDIR /src
 
-# Get Traefik source
 ARG TRAEFIK_REPO=https://github.com/traefik/traefik.git
 ARG TRAEFIK_REF=v3.7.1
+ARG PLUGIN_REPO=https://github.com/ndowens/traefik-proxmox-provider.git
+ARG PLUGIN_REF=master
+
+# Clone Traefik
 RUN git clone --depth 1 --branch ${TRAEFIK_REF} ${TRAEFIK_REPO} traefik
 
-# Copy local plugin if using local path (uncomment the following line when using local plugin)
-COPY ../traefik-proxmox-provider /src/traefik-proxmox-provider
+# Clone plugin into workspace
+RUN git clone --depth 1 --branch ${PLUGIN_REF} ${PLUGIN_REPO} traefik-proxmox-provider
 
 WORKDIR /src/traefik
-RUN sed -i 's,1.25.0,1.25,' go.mod
-# If using a local plugin copy above, add a replace directive so Traefik's go.mod can find it.
-# This injects a replace into the module before building.
-# (Only needed for local plugin; when using published module, skip this.)
-ARG LOCAL_PLUGIN_PATH=
-RUN if [ -n "$LOCAL_PLUGIN_PATH" ]; then \
-      printf 'replace github.com/ndowens/traefik-proxmox-provider => %s\n' "$LOCAL_PLUGIN_PATH" >> go.mod; \
-    fi
 
-# Ensure plugin import is referenced so it gets linked into the binary.
-# Create a small file that imports the plugin package for side-effect registration.
+# Add replace directive so Traefik's go.mod resolves the local plugin copy
+RUN printf '\nreplace github.com/ndowens/traefik-proxmox-provider => ../traefik-proxmox-provider\n' >> go.mod
+
+# Add side-effect import to ensure plugin is linked
 RUN cat > internal/local_plugins_imports.go <<'EOF'
-// Code generated for adding local plugin imports
+// Code generated to import local plugin for build
 package main
 
 import (
