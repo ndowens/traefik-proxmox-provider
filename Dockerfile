@@ -1,5 +1,5 @@
 # Stage 1: builder
-FROM golang:1.20-alpine AS builder
+FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache git ca-certificates
 
 WORKDIR /src
@@ -16,6 +16,10 @@ RUN git clone --depth 1 --branch ${TRAEFIK_REF} ${TRAEFIK_REPO} traefik
 RUN git clone --depth 1 --branch ${PLUGIN_REF} ${PLUGIN_REPO} traefik-proxmox-provider
 
 WORKDIR /src/traefik
+
+RUN sed -i 's|1.25.0|1.25|' go.mod
+
+RUN go mod tidy
 
 # Add replace directive so Traefik's go.mod resolves the local plugin copy
 RUN printf '\nreplace github.com/ndowens/traefik-proxmox-provider => ../traefik-proxmox-provider\n' >> go.mod
