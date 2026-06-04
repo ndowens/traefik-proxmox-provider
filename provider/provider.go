@@ -313,8 +313,9 @@ func generateConfiguration(servicesMap map[string][]internal.Service) *dynamic.C
 
 	for nodeName, services := range servicesMap {
 		for _, service := range services {
-			if len(service.Config) == 0 || !isBoolLabelEnabled(service.Config, "traefik.enable") {
-				log.Printf("Skipping service %s (ID: %d) because traefik.enable is not true", service.Name, service.ID)
+			// traefik.enable defaults to true — skip only if explicitly set to "false"
+			if isExplicitlyDisabled(service.Config, "traefik.enable") {
+				log.Printf("Skipping service %s (ID: %d) because traefik.enable=false", service.Name, service.ID)
 				continue
 			}
 
@@ -679,7 +680,18 @@ func validateConfig(config *Config) error {
 	return nil
 }
 
-func isBoolLabelEnabled(labels map[string]string, label string) bool {
+
+
+// isExplicitlyDisabled returns true only when the label is present and set to
+// "false", "0", "no", or "off". An absent label is treated as enabled.
+func isExplicitlyDisabled(labels map[string]string, label string) bool {
 	val, exists := labels[label]
-	return exists && val == "true"
+	if !exists {
+		return false
+	}
+	switch strings.ToLower(val) {
+	case "false", "0", "no", "off":
+		return true
+	}
+	return false
 }

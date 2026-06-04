@@ -3,6 +3,7 @@
 A Traefik provider that automatically configures routing based on Proxmox VE virtual machines and containers.
 
 > **Fork note:** This is a fork of [NX211/traefik-proxmox-provider](https://github.com/NX211/traefik-proxmox-provider) with the following changes:
+> - **`traefik.enable` defaults to true** — every VM/container is proxied unless you add `traefik.enable=false`
 > - **TLS on by default** — no need to add `tls=true` labels; opt out with `tls=false`
 > - **`websecure` entrypoint by default** — no need to add `entrypoints=websecure`
 > - **Port in rule label** — write `Host(\`app.example.com\`):8080` instead of a separate `loadbalancer.server.port` label
@@ -25,8 +26,8 @@ A Traefik provider that automatically configures routing based on Proxmox VE vir
 experimental:
   plugins:
     traefik-proxmox-provider:
-      moduleName: github.com/ndowens/traefik-proxmox-provider
-      version: v1
+      moduleName: github.com/NX211/traefik-proxmox-provider
+      version: v0.8.1
 ```
 
 2. Configure the provider in your Traefik dynamic configuration:
@@ -60,7 +61,7 @@ pveum acl modify / -token 'root@pam!traefik_prod' -role traefik-provider
 
 Add Traefik labels to a VM or container's **Notes** field in Proxmox (one label per line).
 
-### Minimal setup (new — port inline in rule)
+### Minimal setup (new — no labels needed except the rule)
 
 ```
 traefik.enable=true
