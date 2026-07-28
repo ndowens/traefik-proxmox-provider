@@ -318,6 +318,13 @@ func generateConfiguration(servicesMap map[string][]internal.Service) *dynamic.C
 				continue
 			}
 
+			// Fold "traefik.https.routers.*" labels into the standard
+			// "traefik.http.routers.*" namespace, remembering which router
+			// names were declared this way so they can be forced onto
+			// TLS + the websecure entrypoint later, regardless of any other
+			// (possibly conflicting) labels present on that router.
+			forcedHTTPSRouters := normalizeHTTPSRouterLabels(service.Config)
+
 			routerPrefixMap := make(map[string]bool)
 			servicePrefixMap := make(map[string]bool)
 
@@ -348,7 +355,7 @@ func generateConfiguration(servicesMap map[string][]internal.Service) *dynamic.C
 				serviceNames = []string{defaultID}
 			}
 
-			// --- CHANGE 1: parse port-from-rule for every router label ---
+			// Parse port-from-rule for every router label.
 			// Build a map of routerName -> inline port (extracted from the rule value).
 			// e.g. "Host(`myapp.example.com`):8080"  ->  port "8080", rule "Host(`myapp.example.com`)"
 			routerInlinePort := make(map[string]string)
@@ -373,7 +380,7 @@ func generateConfiguration(servicesMap map[string][]internal.Service) *dynamic.C
 
 				applyServiceOptions(loadBalancer, service, serviceName)
 
-				// --- CHANGE 2: pass inline-port map so getServiceURL can use it ---
+				// Pass inline-port map so getServiceURL can use it.
 				serverURL := getServiceURL(service, serviceName, nodeName, routerInlinePort)
 				loadBalancer.Servers = append(loadBalancer.Servers, dynamic.Server{
 					URL: serverURL,
@@ -400,7 +407,7 @@ func generateConfiguration(servicesMap map[string][]internal.Service) *dynamic.C
 					Priority: 1,
 				}
 
-				applyRouterOptions(router, service, routerName)
+				applyRouterOptions(router, service, routerName, forcedHTTPSRouters)
 
 				config.HTTP.Routers[routerName] = router
 			}
@@ -410,6 +417,36 @@ func generateConfiguration(servicesMap map[string][]internal.Service) *dynamic.C
 	}
 
 	return config
+}
+
+// normalizeHTTPSRouterLabels rewrites any "traefik.https.routers.<name>.*" label into the
+// "traefik.http.routers.<name>.*" namespace the rest of the parser understands, and returns
+// the set of router names that were declared this way so they can be forced onto TLS +
+// the websecure entrypoint later, regardless of any other conflicting labels.
+func normalizeHTTPSRouterLabels(cfg map[string]string) map[string]bool {
+	forced := make(map[string]bool)
+	for k, v := range cfg {
+		if !strings.HasPrefix(k, "traefik.https.routers.") {
+			continue
+		}
+		parts := strings.Split(k, ".")
+		if len(parts) > 3 {
+			forced[parts[3]] = true
+		}
+		newKey := "traefik.http." + strings.TrimPrefix(k, "traefik.https.")
+		cfg[newKey] = v
+		delete(cfg, k)
+	}
+	return forced
+}
+
+func containsString(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 // splitRulePort splits a raw rule value that may carry an inline port suffix.
@@ -439,17 +476,23 @@ func splitRulePort(raw string) (rule, port string) {
 }
 
 // applyRouterOptions applies router configuration options from labels.
-func applyRouterOptions(router *dynamic.Router, service internal.Service, routerName string) {
+func applyRouterOptions(router *dynamic.Router, service internal.Service, routerName string, forcedHTTPS map[string]bool) {
 	prefix := fmt.Sprintf("traefik.http.routers.%s", routerName)
 
 	// Handle EntryPoints
-	// --- CHANGE 3: default to "websecure" when no entrypoint label is set ---
+	// Default to "websecure" when no entrypoint label is set.
 	if entrypoints, exists := service.Config[prefix+".entrypoints"]; exists {
 		router.EntryPoints = strings.Split(entrypoints, ",")
 	} else if entrypoint, exists := service.Config[prefix+".entrypoint"]; exists {
 		router.EntryPoints = []string{entrypoint}
 	} else {
 		router.EntryPoints = []string{"websecure"}
+	}
+
+	// A router declared via "traefik.https.routers.*" must always be reachable over
+	// websecure, even if a conflicting entrypoints label was also present.
+	if forcedHTTPS[routerName] && !containsString(router.EntryPoints, "websecure") {
+		router.EntryPoints = append(router.EntryPoints, "websecure")
 	}
 
 	// Handle Middlewares
@@ -465,8 +508,7 @@ func applyRouterOptions(router *dynamic.Router, service internal.Service, router
 	}
 
 	// Handle TLS
-	tlsCfg := handleRouterTLS(service, prefix)
-	router.TLS = tlsCfg
+	router.TLS = handleRouterTLS(service, prefix, forcedHTTPS[routerName])
 }
 
 // applyServiceOptions applies service configuration options from labels.
@@ -523,16 +565,21 @@ func applyServiceOptions(lb *dynamic.ServersLoadBalancer, service internal.Servi
 }
 
 // handleRouterTLS builds the TLS config for a router.
-// --- CHANGE 4: TLS is ON by default; set traefik.http.routers.<name>.tls=false to disable ---
-func handleRouterTLS(service internal.Service, prefix string) *dynamic.RouterTLSConfig {
+// TLS is ON by default; set traefik.http.routers.<name>.tls=false to disable — unless
+// force is true (the router was declared via traefik.https.routers.*), in which case
+// TLS always stays on regardless of any tls=false label.
+func handleRouterTLS(service internal.Service, prefix string, force bool) *dynamic.RouterTLSConfig {
 	// Explicit opt-out: traefik.http.routers.<name>.tls=false
-	if tlsLabel, exists := service.Config[prefix+".tls"]; exists {
-		if tlsLabel == "false" {
-			return nil
+	if !force {
+		if tlsLabel, exists := service.Config[prefix+".tls"]; exists {
+			if tlsLabel == "false" {
+				return nil
+			}
 		}
 	}
 
-	// TLS is enabled by default (or explicitly via tls=true / any tls.* label).
+	// TLS is enabled by default (or explicitly via tls=true / any tls.* label,
+	// or because this router was forced via traefik.https.routers.*).
 	tlsConfig := &dynamic.RouterTLSConfig{}
 
 	if certResolver, ok := service.Config[prefix+".tls.certresolver"]; ok {
@@ -555,7 +602,7 @@ func handleRouterTLS(service internal.Service, prefix string) *dynamic.RouterTLS
 }
 
 // getServiceURL builds the backend server URL.
-// --- CHANGE 5: accept routerInlinePort so a port embedded in the rule label is honoured ---
+// Accepts routerInlinePort so a port embedded in the rule label is honoured.
 func getServiceURL(service internal.Service, serviceName string, nodeName string, routerInlinePort map[string]string) string {
 	// Direct URL override takes precedence.
 	urlLabel := fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.url", serviceName)
